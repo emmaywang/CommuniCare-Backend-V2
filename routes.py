@@ -12,12 +12,14 @@ USERNAME = 'pending'
 PASSWORD = 'pending'
 DRIVER = '{ODBC Driver 17 for SQL Server}'
 
-
+conn_str="Driver={ODBC Driver 18 for SQL Server};Server=tcp:communicare-connect.database.windows.net,1433;Database=HealthConnectDB;Uid=CloudSA2d1c726f;Pwd={communicare_123};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 def get_db_connection():
-    conn = pyodbc.connect(
-        f'DRIVER={DRIVER};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}'
-    )
+    # conn = pyodbc.connect(
+    #     f'DRIVER={DRIVER};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}'
+    # )
+    conn=pyodbc.connect(conn_str)
     return conn
+    
 
 # example endpoint to fetch all programs
 @app.route('/programs', methods=['GET'])

@@ -61,18 +61,18 @@ def create_programs_table():
         BEGIN
             CREATE TABLE Programs (
                 id INT PRIMARY KEY IDENTITY(1,1),
-                name NVARCHAR(255)
+                name NVARCHAR(255),
                 languages NVARCHAR(MAX),
                 website NVARCHAR(255),
                 services NVARCHAR(MAX),
                 paymentModel NVARCHAR(255),
-                clinic NVARCHAR(255),
+                clinic INT,
                 location NVARCHAR(255),
                 opening_hour NVARCHAR(50),
                 closing_hour NVARCHAR(50),
                 contact_information NVARCHAR(255),
                 service_description NVARCHAR(MAX),
-                FOREIGN KEY (clinic) REFERENCES Clinics(clinic_name)
+                FOREIGN KEY (clinic) REFERENCES Clinics(clinic_id)
             );
         END
     """)
