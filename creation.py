@@ -95,6 +95,49 @@ def create_programs_table():
     print("Clinics table created (if it didn't already exist).")
 
 
+def create_bookmarklists_table():
+    conn = routes.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BookmarkLists')
+        BEGIN
+            CREATE TABLE BookmarkLists (
+                list_id INT PRIMARY KEY IDENTITY(1,1),
+                username NVARCHAR(255) NOT NULL,
+                list_name NVARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (username) REFERENCES Users(username)
+            );
+        END   
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("BookmarkLists table created (if it didn't already exist).")
+
+def create_bookmarks_table():
+    conn = routes.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Bookmarks')
+        BEGIN
+            CREATE TABLE Bookmarks (
+                bookmark_id INT PRIMARY KEY IDENTITY(1,1),
+                list_id INT NOT NULL,
+                resource_type NVARCHAR(50) NOT NULL,  -- e.g., 'Program', 'Clinic'
+                resource_id INT NOT NULL,            -- ID of the resource in its table
+                note NVARCHAR(MAX),                  -- optional note from the user
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (list_id) REFERENCES BookmarkLists(list_id)
+            );
+        END
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("Bookmarks table created (if it didn't already exist).")    
+
+
 if __name__ == "__main__":
     create_users_table()
     create_clinics_table()
