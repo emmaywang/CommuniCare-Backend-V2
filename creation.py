@@ -1,13 +1,16 @@
 import pyodbc
 import routes
-#one-time scripts to create tables
+
+# one-time scripts to create tables
+
 
 # create the Users table
 def create_users_table():
     conn = routes.get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
+
+    cursor.execute(
+        """
         IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Users')
         BEGIN
             CREATE TABLE Users (
@@ -23,19 +26,22 @@ def create_users_table():
                 Premium BIT NOT NULL DEFAULT 0
             );
         END
-    """)
+    """
+    )
 
     conn.commit()
     cursor.close()
     conn.close()
     print("Users table created (if it didn't already exist).")
 
+
 # create the Clinics table
 def create_clinics_table():
     conn = routes.get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Clinics')
         BEGIN
             CREATE TABLE Clinics (
@@ -46,17 +52,20 @@ def create_clinics_table():
                 email NVARCHAR(255)
             );
         END
-    """)
+    """
+    )
 
     conn.commit()
     cursor.close()
     conn.close()
 
+
 def create_programs_table():
     conn = routes.get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Programs')
         BEGIN
             CREATE TABLE Programs (
@@ -75,7 +84,8 @@ def create_programs_table():
                 FOREIGN KEY (clinic) REFERENCES Clinics(clinic_id)
             );
         END
-    """)
+    """
+    )
 
     conn.commit()
     cursor.close()
@@ -83,6 +93,7 @@ def create_programs_table():
     print("Programs table created (if it didn't already exist).")
 
     print("Clinics table created (if it didn't already exist).")
+
 
 def create_bookmarklists_table():
     conn = routes.get_db_connection()
@@ -125,6 +136,7 @@ def create_bookmarks_table():
     cursor.close()
     conn.close()
     print("Bookmarks table created (if it didn't already exist).")    
+
 
 if __name__ == "__main__":
     create_users_table()
