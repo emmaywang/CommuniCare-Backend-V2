@@ -1,6 +1,8 @@
 # run pip install pyodbc
+#run pip install authlib
 
 from flask import Flask, jsonify, request
+from authlib.integrations.flask_client import OAuth
 import pyodbc
 import json
 from math import radians, sin, cos, sqrt, atan2
@@ -188,7 +190,11 @@ def get_user(username):
                 "premium": user.Premium,
             }
             return jsonify(data), 200
+    except:
         return failure_response("User not found", 404)
+    finally:
+        cursor.close()
+        conn.close()
       
       
 @app.route("/api/users/<string:username>", methods=["POST"])
