@@ -3,6 +3,8 @@
 
 from flask import Flask, jsonify, request
 from authlib.integrations.flask_client import OAuth
+from firebase_admin import auth
+from firebase import firebase_app
 import pyodbc
 import json
 from math import radians, sin, cos, sqrt, atan2
@@ -10,11 +12,11 @@ from math import radians, sin, cos, sqrt, atan2
 app = Flask(__name__)
 
 # Azure SQL Database connection details
-SERVER = "pending"
-DATABASE = "pending"
-USERNAME = "pending"
-PASSWORD = "pending"
-DRIVER = "{ODBC Driver 17 for SQL Server}"
+# SERVER = "pending"
+# DATABASE = "pending"
+# USERNAME = "pending"
+# PASSWORD = "pending"
+# DRIVER = "{ODBC Driver 17 for SQL Server}"
 
 conn_str="Driver={ODBC Driver 18 for SQL Server};Server=tcp:communicare-connect.database.windows.net,1433;Database=HealthConnectDB;Uid=CloudSA2d1c726f;Pwd={communicare_123};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 def get_db_connection():
@@ -30,6 +32,73 @@ def get_db_connection():
 def failure_response(message, code=404):
     return json.dumps({"success": False, "error": message}), code
 
+#---------AUTH------------
+def authenticate_request():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+    
+    try:
+        token = auth_header.split(" ")[1]  # Expecting "Bearer <token>"
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception:
+        return None
+
+# @app.route("/api/protected", methods=["GET"])
+def protected_route():
+    user = authenticate_request()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    return jsonify({"user":user}), 200
+
+# @app.route("/api/username-check", methods=["GET"])
+def username_check(username):
+    cursor=get_db_connection()
+    response = protected_route()
+    status_code = response[1] 
+    if status_code != 200:
+        return response #that is, jsonify({"error": "Unauthorized"}), 401
+    user=response["user"]
+    user_id = user["uid"]
+    cursor.execute("SELECT username FROM Users WHERE firebaseUid = ?", (user_id,))
+    found_username=cursor.fetchone() #the username matching the firebase uid given in the token
+    if found_username!=username:
+        return jsonify({"error": "Invalid permissions"}), 401
+    
+    return response #that is, jsonify({"user":user})
+
+@app.route("/api/verify-user", methods=["POST"])
+def verify_firebase_token():
+    try:
+        data = request.get_json()
+        token = data.get("token")
+
+        # Verify Firebase ID token
+        decoded_token = auth.verify_id_token(token)
+        user_id = decoded_token["uid"]
+        email = decoded_token.get("email")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if user exists in Azure SQL database
+        cursor.execute("SELECT * FROM Users WHERE firebaseUid = ?", user_id)
+        user = cursor.fetchone()
+
+        if not user:
+            # User is new – return response asking for additional info
+            return jsonify({"new_user": True, "message": "Complete your profile"}), 200
+
+        conn.close()
+        return jsonify({"success": True, "userId": user_id})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+
+#------------END AUTH------------------------------
 
 # example endpoint to fetch all programs
 @app.route("/programs", methods=["GET"])
@@ -87,6 +156,8 @@ def search_programs():
             # Fetch user details if username is provided
             user_details = {}
             if account:
+                username_check(username)
+                
                 cursor.execute("SELECT * FROM Users WHERE username = ?;", (username,))
                 user_details = cursor.fetchone()
                 if user_details:
@@ -174,6 +245,7 @@ def get_user(username):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        username_check(username)
         cursor.execute("SELECT * FROM Users WHERE username = ?;", (username,))
         user = cursor.fetchone()
         if user:
@@ -237,6 +309,7 @@ def delete_user(username):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute("DELETE FROM Users WHERE username = ?;", (username,))
@@ -254,6 +327,7 @@ def update_user_insurance_plan(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -279,6 +353,7 @@ def update_user_insurance_company(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -307,6 +382,7 @@ def update_user_sex(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -332,6 +408,7 @@ def update_user_services(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute("SELECT services FROM Users WHERE username = ?;", (username,))
@@ -365,6 +442,7 @@ def update_user_age(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -390,6 +468,7 @@ def update_user_policy(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -415,6 +494,7 @@ def update_user_past_medical_history(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -445,6 +525,7 @@ def update_user_Current_health_conditions(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -475,6 +556,7 @@ def update_user_premium(username):
     cursor = conn.cursor()
     try:
         data = request.get_json()
+        username_check(username)
         if not user_check(cursor, username):
             return failure_response("User does not exists", 404)
         cursor.execute(
@@ -508,6 +590,7 @@ def create_bookmark_list():
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    username_check(username)
     try:
         cursor.execute("""
             INSERT INTO BookmarkLists (username, list_name)
@@ -535,6 +618,7 @@ def add_bookmark(list_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    username_check(username)
     try:
         cursor.execute("""
             INSERT INTO Bookmarks (list_id, resource_type, resource_id, note)
@@ -553,6 +637,7 @@ def add_bookmark(list_id):
 def get_user_bookmark_lists(username):
     conn = get_db_connection()
     cursor = conn.cursor()
+    username_check(username)
     try:
         # Get all lists for the user
         cursor.execute("""
@@ -599,6 +684,7 @@ def get_user_bookmark_lists(username):
 def delete_bookmark(list_id, bookmark_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    username_check(username)
     try:
         cursor.execute("""
             DELETE FROM Bookmarks
