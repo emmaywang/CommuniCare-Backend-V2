@@ -2,6 +2,7 @@
 #run pip install authlib
 
 from flask import Flask, jsonify, request
+import requests
 from authlib.integrations.flask_client import OAuth
 from firebase_admin import auth
 from firebase import firebase_app
@@ -200,20 +201,29 @@ def search_programs():
 
             cursor.execute(sql, params)
             programs = cursor.fetchall()
-
+            if not programs:
+                return jsonify({"message": "No programs that fit criteria."}), 200
             # Filter programs by distance
             filtered_programs = []
-            for program in programs:
-                program_lat, program_lon = map(
-                    float, program.location.strip("()").split(",")
-                )
-                if (
-                    calculate_distance(
-                        user_latitude, user_longitude, program_lat, program_lon
-                    )
-                    <= radius
-                ):
-                    filtered_programs.append(program)
+            google_url = "https://maps.googleapis.com/maps/api/distancematrix/json"
+            program_lats_lons = ""
+            program_lats_lons = "|".join([i.location.strip("()") for i in programs])
+            google_params = {
+                "destinations": program_lats_lons,
+                "origins": user_latitude + "," + user_longitude,
+                "key": "YOUR_API_KEY"
+            }
+            response = requests.get(google_url, params=google_params)
+            if response.status_code != 200:
+                return jsonify({"error": "Failed to fetch response from Google distance calculator"}), response.status_code
+            google_data = response.json()
+            if "rows" not in google_data or not google_data["rows"]:
+                return jsonify({"error": "Invalid response from Google distance API"}), 500
+            lst = google_data["rows"][0]["elements"]
+            for i in range(len(lst)):
+                if lst[i]["distance"]["value"] <= radius:  #radius is in meters (?)
+                    filtered_programs.append(programs[i])
+            
             final_programs = []
             for program in filtered_programs:
                 final_programs.append(

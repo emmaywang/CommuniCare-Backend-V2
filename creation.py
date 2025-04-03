@@ -23,7 +23,8 @@ def create_users_table():
                 Age INT CHECK (Age >= 0),
                 Past_medical_history NVARCHAR(MAX) CHECK (ISJSON(Past_medical_history) = 1),
                 Current_health_conditions NVARCHAR(MAX) CHECK (ISJSON(Current_health_conditions) = 1),
-                Premium BIT NOT NULL DEFAULT 0
+                Premium BIT NOT NULL DEFAULT 0,
+                firebase_uid VARCHAR(36) UNIQUE NULL
             );
         END
     """
