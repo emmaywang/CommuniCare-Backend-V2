@@ -63,7 +63,7 @@ def username_check(username):
         return response #that is, jsonify({"error": "Unauthorized"}), 401
     user=response["user"]
     user_id = user["uid"]
-    cursor.execute("SELECT username FROM Users WHERE firebaseUid = ?", (user_id,))
+    cursor.execute("SELECT username FROM Users WHERE firebase_uid = ?", (user_id,))
     found_username=cursor.fetchone() #the username matching the firebase uid given in the token
     if found_username!=username:
         return jsonify({"error": "Invalid permissions"}), 401
@@ -85,7 +85,7 @@ def verify_firebase_token():
         cursor = conn.cursor()
 
         # Check if user exists in Azure SQL database
-        cursor.execute("SELECT * FROM Users WHERE firebaseUid = ?", user_id)
+        cursor.execute("SELECT * FROM Users WHERE firebase_uid = ?", user_id)
         user = cursor.fetchone()
 
         if not user:
