@@ -1,0 +1,6 @@
+flask
+requests
+authlib
+firebase-admin
+pyodbc
+firebase
