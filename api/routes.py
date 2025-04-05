@@ -824,6 +824,6 @@ def delete_reminder_by_user_clinic(user_id: int, clinic_id: int):
         return jsonify({'message': 'Appointment failed to delete.'}), 500
 
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
-handler = app
+if __name__ == '__main__':
+    app.run(debug=True)
+# handler = app
