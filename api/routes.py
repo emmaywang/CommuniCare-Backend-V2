@@ -9,6 +9,10 @@ from firebase import firebase_app
 import pyodbc
 import json
 from math import radians, sin, cos, sqrt, atan2
+from dotenv import load_dotenv
+import os
+
+
 
 app = Flask(__name__)
 
@@ -19,7 +23,8 @@ app = Flask(__name__)
 # PASSWORD = "pending"
 # DRIVER = "{ODBC Driver 17 for SQL Server}"
 
-conn_str="Driver={ODBC Driver 18 for SQL Server};Server=tcp:communicare-connect.database.windows.net,1433;Database=HealthConnectDB;Uid=CloudSA2d1c726f;Pwd={communicare_123};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+load_dotenv()
+conn_str=os.getenv("DATABASE_CONNECTION")
 def get_db_connection():
 
     # conn = pyodbc.connect(
