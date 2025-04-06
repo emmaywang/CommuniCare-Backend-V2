@@ -1,0 +1,4 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/3eb16afc-cae0-4e0b-8e0e-08180120a5cf/resourceGroups/CommuniCare/providers/Microsoft.Web/sites/communicare-backend-api",
+    "appService.deploySubpath": "api"
+}
