@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request
 import requests
 from authlib.integrations.flask_client import OAuth
 from firebase_admin import auth
-from firebase import firebase_app
+from .firebase import firebase_app
 import pyodbc
 import json
 from math import radians, sin, cos, sqrt, atan2
@@ -15,6 +15,10 @@ import os
 # Change these values to the ones used to create the App Service.
 
 app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Hello from CommuniCare!"
 
 # Azure SQL Database connection details
 # SERVER = "pending"
@@ -830,6 +834,9 @@ def delete_bookmark(list_id, bookmark_id):
 #         return jsonify({'message': 'Appointment failed to delete.'}), 500
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
+
 # handler = app

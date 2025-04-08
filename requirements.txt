@@ -3,4 +3,5 @@ requests
 authlib
 firebase-admin
 pyodbc
-dotenv
+python-dotenv
+gunicorn
