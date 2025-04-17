@@ -1,5 +1,5 @@
 # run pip install pyodbc
-#run pip install authlib
+# run pip install authlib
 
 from flask import Flask, jsonify, request
 import requests
@@ -16,9 +16,11 @@ import os
 
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def home():
     return "Hello from CommuniCare!"
+
 
 # Azure SQL Database connection details
 # SERVER = "pending"
@@ -28,26 +30,44 @@ def home():
 # DRIVER = "{ODBC Driver 17 for SQL Server}"
 
 load_dotenv()
-conn_str=os.getenv("DATABASE_CONNECTION")
+conn_str = os.getenv("DATABASE_CONNECTION")
+
+
+@app.route("/health-check")
+def health_check():
+    try:
+        # Test DB connection with actual credentials
+        with pyodbc.connect(conn_str) as conn:
+            # Simple query verification
+            conn.execute("SELECT 1;").fetchval()
+        return "OK", 200
+    except pyodbc.Error as e:
+        app.logger.error(f"Database connection failed: {str(e)}")
+        return f"Database Error: {str(e)}", 500
+    except Exception as e:
+        app.logger.error(f"Health check error: {str(e)}")
+        return f"Application Error: {str(e)}", 500
+
+
 def get_db_connection():
 
     # conn = pyodbc.connect(
     #     f'DRIVER={DRIVER};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}'
     # )
-    conn=pyodbc.connect(conn_str)
+    conn = pyodbc.connect(conn_str)
     return conn
-    
 
 
 def failure_response(message, code=404):
     return json.dumps({"success": False, "error": message}), code
 
-#---------AUTH------------
+
+# ---------AUTH------------
 def authenticate_request():
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         return None
-    
+
     try:
         token = auth_header.split(" ")[1]  # Expecting "Bearer <token>"
         decoded_token = auth.verify_id_token(token)
@@ -55,29 +75,34 @@ def authenticate_request():
     except Exception:
         return None
 
+
 # @app.route("/api/protected", methods=["GET"])
 def protected_route():
     user = authenticate_request()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
-    
-    return jsonify({"user":user}), 200
+
+    return jsonify({"user": user}), 200
+
 
 # @app.route("/api/username-check", methods=["GET"])
 def username_check(username):
-    cursor=get_db_connection()
+    cursor = get_db_connection()
     response = protected_route()
-    status_code = response[1] 
+    status_code = response[1]
     if status_code != 200:
-        return response #that is, jsonify({"error": "Unauthorized"}), 401
-    user=response["user"]
+        return response  # that is, jsonify({"error": "Unauthorized"}), 401
+    user = response["user"]
     user_id = user["uid"]
-    cursor.execute("SELECT username FROM Users WHERE firebase_uid = ?", (user_id,))
-    found_username=cursor.fetchone() #the username matching the firebase uid given in the token
-    if found_username!=username:
+    cursor.execute("SELECT username FROM Users WHERE firebase_uid = ?;", (user_id,))
+    found_username = (
+        cursor.fetchone()
+    )  # the username matching the firebase uid given in the token
+    if found_username != username:
         return jsonify({"error": "Invalid permissions"}), 401
-    
-    return response #that is, jsonify({"user":user})
+
+    return response  # that is, jsonify({"user":user})
+
 
 @app.route("/api/verify-user", methods=["POST"])
 def verify_firebase_token():
@@ -94,7 +119,7 @@ def verify_firebase_token():
         cursor = conn.cursor()
 
         # Check if user exists in Azure SQL database
-        cursor.execute("SELECT * FROM Users WHERE firebase_uid = ?", user_id)
+        cursor.execute("SELECT * FROM Users WHERE firebase_uid = ?;", user_id)
         user = cursor.fetchone()
 
         if not user:
@@ -108,22 +133,30 @@ def verify_firebase_token():
         return jsonify({"error": str(e)}), 401
 
 
-#------------END AUTH------------------------------
+# ------------END AUTH------------------------------
+
 
 # example endpoint to fetch all programs
 @app.route("/programs", methods=["GET"])
 def get_programs():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT name, services, website FROM Programs;")
-    customers = [
-        {"name": row.name, "services": row.services, "website": row.website}
-        for row in cursor.fetchall()
-    ]
-    cursor.close()
-    conn.close()
-    return jsonify(customers)
+    try:
+        # Original connection
+        conn = pyodbc.connect(conn_str)  # Hardcoded or from variable
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, services, website FROM Programs;")
+        columns = [column[0] for column in cursor.description]
 
+        # Convert rows to dictionaries properly
+        programs = []
+        for row in cursor.fetchall():
+            programs.append(dict(zip(columns, row)))
+        return jsonify(programs)
+    except Exception as e:
+        print("FULL ERROR TRACEBACK:", repr(e))
+        return {"error": str(e), "type": type(e).__name__}, 500
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -167,7 +200,7 @@ def search_programs():
             user_details = {}
             if account:
                 username_check(username)
-                
+
                 cursor.execute("SELECT * FROM Users WHERE username = ?;", (username,))
                 user_details = cursor.fetchone()
                 if user_details:
@@ -220,19 +253,29 @@ def search_programs():
             google_params = {
                 "destinations": program_lats_lons,
                 "origins": user_latitude + "," + user_longitude,
-                "key": "YOUR_API_KEY"
+                "key": "YOUR_API_KEY",
             }
             response = requests.get(google_url, params=google_params)
             if response.status_code != 200:
-                return jsonify({"error": "Failed to fetch response from Google distance calculator"}), response.status_code
+                return (
+                    jsonify(
+                        {
+                            "error": "Failed to fetch response from Google distance calculator"
+                        }
+                    ),
+                    response.status_code,
+                )
             google_data = response.json()
             if "rows" not in google_data or not google_data["rows"]:
-                return jsonify({"error": "Invalid response from Google distance API"}), 500
+                return (
+                    jsonify({"error": "Invalid response from Google distance API"}),
+                    500,
+                )
             lst = google_data["rows"][0]["elements"]
             for i in range(len(lst)):
-                if lst[i]["distance"]["value"] <= radius:  #radius is in meters (?)
+                if lst[i]["distance"]["value"] <= radius:  # radius is in meters (?)
                     filtered_programs.append(programs[i])
-            
+
             final_programs = []
             for program in filtered_programs:
                 final_programs.append(
@@ -286,8 +329,8 @@ def get_user(username):
     finally:
         cursor.close()
         conn.close()
-      
-      
+
+
 @app.route("/api/users/<string:username>", methods=["POST"])
 def create_user(username):
     conn = get_db_connection()
@@ -320,9 +363,8 @@ def create_user(username):
         return jsonify({"success": True, "message": "User created", "body": data}), 201
     except:
         return failure_response("An error occurred", 500)
-      
-      
-      
+
+
 @app.route("/api/users/<string:username>", methods=["DELETE"])
 def delete_user(username):
     conn = get_db_connection()
@@ -336,9 +378,7 @@ def delete_user(username):
         return jsonify({"success": True, "message": "User deleted"}), 200
     except:
         return failure_response("An error occurred", 500)
-      
-      
-      
+
 
 @app.route("/api/users/insurance_plan/<string:username>", methods=["PUT"])
 def update_user_insurance_plan(username):
@@ -537,8 +577,6 @@ def update_user_past_medical_history(username):
 
 
 @app.route("/api/users/current_health_conditions/<string:username>", methods=["PUT"])
-
-
 def update_user_Current_health_conditions(username):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -596,25 +634,30 @@ def update_user_premium(username):
         cursor.close()
         conn.close()
 
-#------BOOKMARKS---------
 
-@app.route('/api/bookmark-lists', methods=['POST'])
+# ------BOOKMARKS---------
+
+
+@app.route("/api/bookmark-lists", methods=["POST"])
 def create_bookmark_list():
     data = request.get_json()
-    username = data.get('username')
-    list_name = data.get('list_name')
-    
+    username = data.get("username")
+    list_name = data.get("list_name")
+
     if not username or not list_name:
         return jsonify({"error": "Missing username or list_name"}), 400
-    
+
     conn = get_db_connection()
     cursor = conn.cursor()
     username_check(username)
     try:
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO BookmarkLists (username, list_name)
-            VALUES (?, ?)
-        """, (username, list_name)) #database automatically adds list_id and created_at
+            VALUES (?, ?);
+        """,
+            (username, list_name),
+        )  # database automatically adds list_id and created_at
         conn.commit()
         return jsonify({"message": "Bookmark list created successfully"}), 201
     except Exception as e:
@@ -622,15 +665,14 @@ def create_bookmark_list():
     finally:
         cursor.close()
         conn.close()
-        
-        
-        
-@app.route('/api/bookmark-lists/<int:list_id>/bookmarks', methods=['POST'])
+
+
+@app.route("/api/bookmark-lists/<int:list_id>/bookmarks", methods=["POST"])
 def add_bookmark(list_id):
     data = request.get_json()
-    resource_type = data.get('resource_type')
-    resource_id = data.get('resource_id')
-    note = data.get('note', '')
+    resource_type = data.get("resource_type")
+    resource_id = data.get("resource_id")
+    note = data.get("note", "")
     protected_route()
     if not resource_type or not resource_id:
         return jsonify({"error": "Missing resource_type or resource_id"}), 400
@@ -639,11 +681,14 @@ def add_bookmark(list_id):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO Bookmarks (list_id, resource_type, resource_id, note)
-            VALUES (?, ?, ?, ?)
-        """, (list_id, resource_type, resource_id, note)) #database automatically adds list_id and created_at
-        #list_id must already exist (so entry in BookmarkLists must be created first)
+            VALUES (?, ?, ?, ?);
+        """,
+            (list_id, resource_type, resource_id, note),
+        )  # database automatically adds list_id and created_at
+        # list_id must already exist (so entry in BookmarkLists must be created first)
         conn.commit()
         return jsonify({"message": "Bookmark added successfully"}), 201
     except Exception as e:
@@ -653,18 +698,21 @@ def add_bookmark(list_id):
         conn.close()
 
 
-@app.route('/api/users/<username>/bookmark-lists', methods=['GET'])
+@app.route("/api/users/<username>/bookmark-lists", methods=["GET"])
 def get_user_bookmark_lists(username):
     conn = get_db_connection()
     cursor = conn.cursor()
     username_check(username)
     try:
         # Get all lists for the user
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT list_id, list_name, created_at
             FROM BookmarkLists
-            WHERE username = ?
-        """, (username,))
+            WHERE username = ?;
+        """,
+            (username,),
+        )
         lists = cursor.fetchall()
         bookmark_lists = []
         for l in lists:
@@ -672,14 +720,17 @@ def get_user_bookmark_lists(username):
                 "list_id": l.list_id,
                 "list_name": l.list_name,
                 "created_at": l.created_at,
-                "bookmarks": []
+                "bookmarks": [],
             }
             # Get bookmarks for each list
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT bookmark_id, resource_type, resource_id, note, created_at
                 FROM Bookmarks
-                WHERE list_id = ?
-            """, (l.list_id,))
+                WHERE list_id = ?;
+            """,
+                (l.list_id,),
+            )
             bookmarks = cursor.fetchall()
             list_dict["bookmarks"] = [
                 {
@@ -687,7 +738,7 @@ def get_user_bookmark_lists(username):
                     "resource_type": b.resource_type,
                     "resource_id": b.resource_id,
                     "note": b.note,
-                    "created_at": b.created_at
+                    "created_at": b.created_at,
                 }
                 for b in bookmarks
             ]
@@ -700,16 +751,21 @@ def get_user_bookmark_lists(username):
         conn.close()
 
 
-@app.route('/api/bookmark-lists/<int:list_id>/bookmarks/<int:bookmark_id>', methods=['DELETE'])
+@app.route(
+    "/api/bookmark-lists/<int:list_id>/bookmarks/<int:bookmark_id>", methods=["DELETE"]
+)
 def delete_bookmark(list_id, bookmark_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM Bookmarks
-            WHERE bookmark_id = ? AND list_id = ?
-        """, (bookmark_id, list_id))
+            WHERE bookmark_id = ? AND list_id = ?;
+        """,
+            (bookmark_id, list_id),
+        )
         if cursor.rowcount == 0:
             return jsonify({"error": "Bookmark not found"}), 404
         conn.commit()
@@ -722,11 +778,9 @@ def delete_bookmark(list_id, bookmark_id):
         conn.close()
 
 
-
-        
 # --------REMINDERS--------------
 
-# # Get all reminders of user by username. 
+# # Get all reminders of user by username.
 # # When authorization is integrated maybe we require User as parameter instead.
 # @app.route('/reminder/<username>', methods=['GET'])
 # def get_reminders_by_user(user_id: int):
@@ -749,7 +803,7 @@ def delete_bookmark(list_id, bookmark_id):
 # def get_reminder_by_clinic_user(user_id: int, clinic_id: int):
 #     conn = get_db_connection()
 #     cursor = conn.cursor()
-    
+
 #     cursor.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id,))
 #     if not cursor.fetchone():
 #         return jsonify({'message': 'User not found'}), 404
@@ -757,11 +811,11 @@ def delete_bookmark(list_id, bookmark_id):
 #     if not reminder:
 #         return jsonify({'message': 'Appointment not found.'}), 404
 #     return jsonify(reminder), 201
-    
+
 # def get_reminder_helper(cursor, user_id: int, clinic_id: int):
 #     cursor.execute(
 #         "SELECT clinic_id, program, time, subject FROM Appointments "
-#         "WHERE user_id = ? AND clinic_id = ?", 
+#         "WHERE user_id = ? AND clinic_id = ?",
 #         (user_id, clinic_id)
 #     )
 #     row = cursor.fetchone()
@@ -786,7 +840,7 @@ def delete_bookmark(list_id, bookmark_id):
 #                    "WHERE user_id = ? AND clinic_id = ?",
 #                    (newInfo['program'], newInfo['time'], newInfo['subject'], user_id, clinic_id))
 #     conn.commit()
-    
+
 #     reminder = get_reminder_helper(cursor, user_id, clinic_id)
 #     if not reminder:
 #         return jsonify({'message': 'Appointment failed to update'}), 500
@@ -809,7 +863,7 @@ def delete_bookmark(list_id, bookmark_id):
 #     cursor.execute("INSERT INTO Appointments (user_id, clinic_id, program, time, subject) VALUES (?,?,?,?,?)",
 #                    (user_id, clinicId, newInfo['program'], newInfo['time'], newInfo['subject']))
 #     conn.commit()
-    
+
 #     reminder = get_reminder_helper(cursor, user_id, clinicId)
 #     if not reminder:
 #         return jsonify({'message': 'Appointment failed to update'}), 500
@@ -825,7 +879,7 @@ def delete_bookmark(list_id, bookmark_id):
 #     reminder = get_reminder_helper(cursor, user_id, clinic_id)
 #     if not reminder:
 #         return jsonify({'message': 'Appointment not found.'}), 404
-#     cursor.execute("DELETE FROM Appointments WHERE user_id = ? AND clinic_id = ?", 
+#     cursor.execute("DELETE FROM Appointments WHERE user_id = ? AND clinic_id = ?",
 #         (user_id, clinic_id))
 #     reminder = get_reminder_helper(cursor, user_id, clinic_id)
 #     if not reminder:
