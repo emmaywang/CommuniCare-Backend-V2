@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request
 import requests
 from authlib.integrations.flask_client import OAuth
 from firebase_admin import auth
-from .firebase import firebase_app
+from firebase_conn import firebase_app
 import pyodbc
 import json
 from math import radians, sin, cos, sqrt, atan2
