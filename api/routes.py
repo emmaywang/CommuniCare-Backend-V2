@@ -111,7 +111,7 @@ def verify_firebase_token():
 #------------END AUTH------------------------------
 
 # example endpoint to fetch all programs
-@app.route("/programs", methods=["GET"])
+@app.route("/api/programs", methods=["GET"])
 def get_programs():
     conn = get_db_connection()
     cursor = conn.cursor()
