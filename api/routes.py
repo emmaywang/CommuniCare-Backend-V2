@@ -139,24 +139,16 @@ def verify_firebase_token():
 # example endpoint to fetch all programs
 @app.route("/api/programs", methods=["GET"])
 def get_programs():
-    try:
-        # Original connection
-        conn = pyodbc.connect(conn_str)  # Hardcoded or from variable
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, services, website FROM Programs;")
-        columns = [column[0] for column in cursor.description]
-
-        # Convert rows to dictionaries properly
-        programs = []
-        for row in cursor.fetchall():
-            programs.append(dict(zip(columns, row)))
-        return jsonify(programs)
-    except Exception as e:
-        print("FULL ERROR TRACEBACK:", repr(e))
-        return {"error": str(e), "type": type(e).__name__}, 500
-    finally:
-        cursor.close()
-        conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, services, website FROM Programs;")
+    customers = [
+        {"name": row.name, "services": row.services, "website": row.website}
+        for row in cursor.fetchall()
+    ]
+    cursor.close()
+    conn.close()
+    return jsonify(customers)
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
