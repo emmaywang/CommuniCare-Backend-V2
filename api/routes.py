@@ -143,7 +143,7 @@ def get_programs():
         # Original connection
         conn = pyodbc.connect(conn_str)  # Hardcoded or from variable
         cursor = conn.cursor()
-        cursor.execute("SELECT name, services, website FROM Programs;")
+        cursor.execute("SELECT * FROM Programs;")
         columns = [column[0] for column in cursor.description]
 
         # Convert rows to dictionaries properly
